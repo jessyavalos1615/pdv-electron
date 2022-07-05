@@ -5,8 +5,50 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add New Product</title>
+    <link rel="stylesheet" href="../../assets/css/bootstrap.min.css">
 </head>
 <body>
-    <h1>Add New Product</h1>
+    <main class="container-fluid">
+        <form class="row p-4" novalidate>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <input id="name" name="name" type="text" placeholder="Product's name" class="form-control" required>
+                    <div class="invalid-feedback">A product name is necesary.</div>
+                </div>
+                <div class="form-group">
+                    <input id="price" name="price" type="text" placeholder="Product's price" class="form-control" required
+                    onkeypress="return onlyNumber(event)">
+                    <div class="invalid-feedback">A product price is necesary</div>
+                </div>
+                <div class="form-group">
+                    <input id="code" name="code" type="text" placeholder="Product's code" class="form-control" required>
+                    <div class="invalid-feedback">A product code is necesary.</div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <input id="stock" name="stock" type="number" min="0" placeholder="Product's stock" class="form-control" disabled required>
+                    <div class="invalid-feedback">A product stock is necesary.</div>
+                </div>
+                <div class="form-group">
+                    <input id="min_stock" name="min_stock" type="number" min="1" placeholder="Product's min stock" class="form-control" disabled>
+                </div>
+                <div class="form-group">
+                    <input id="max_stock" name="max_stock" type="number" min="1" placeholder="Product's max stock" class="form-control" disabled>
+                </div>
+            </div>
+            <div class="col-sm-12 form-check text-right">
+                <input id="manage_stock" name="manage_stock" type="checkbox" class="form-check-input">
+                <label for="manage_stock" class="form-check-label">Manage product stock?</label>
+            </div>
+            <button type="submit" class="btn btn-primary ml-auto mt-3 mr-3">Submit</button>
+        </form>
+    </main>
+    <script src="../../assets/js/newProductWindow.js" async></script>
+    <script>
+        function onlyNumber(event) {
+            return /^[0-9]*[.]{0,1}[0-9]*$/g.test(event.key);
+        }
+    </script>
 </body>
 </html>

@@ -1,11 +1,21 @@
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Notification } = require('electron');
 const url = require('url');
 const path = require('path');
 
+const { getConnection } = require('./database/index');
+
+if (process.env.NODE_ENV !== 'production') {
+    require('electron-reload')(__dirname)
+}
+
 let mainWindow;
+let productsWindow;
+let newProductWindow;
 
 app.on('ready', () => {
     mainWindow = new BrowserWindow({
+        movable: false,
+        simpleFullscreen: true,
         webPreferences: {
             contextIsolation: false,
             nodeIntegration: true,
@@ -13,6 +23,7 @@ app.on('ready', () => {
             // enableRemoteModule: true
         }
     });
+    mainWindow.maximize();
     mainWindow.loadURL(url.format({
         pathname: path.join(__dirname, 'views/mainWindow.html'),
         protocol: 'file',
@@ -23,33 +34,70 @@ app.on('ready', () => {
     mainWindow.on('closed', () => app.quit());
 });
 
+/* ipcMain Events */
+ipcMain.on('product:all', async () => {
+    const products = await getProducts();
+    productsWindow.webContents.send('product:all', products);
+});
+
+ipcMain.on('product:add', e => {
+    newProductWindow = new BrowserWindow({
+        width: 500,
+        height: 600,
+        title: 'Products',
+        movable: false,
+        webPreferences: {
+            contextIsolation: false,
+            nodeIntegration: true,
+            // nodeIntegrationInWorker: true,
+            // enableRemoteModule: true
+        },
+    });
+    // newProductWindow.setMenu(null);
+    newProductWindow.loadURL(url.format({
+        pathname: path.join(__dirname, './views/newProductWindow.html'),
+        protocol: 'file',
+        slashes: true,
+    }));
+    newProductWindow.on('close', () => {
+        newProductWindow = null;
+        productsWindow.focus();
+    });
+});
+
+ipcMain.on('product:new', async (e, newProduct) => {
+    const product = await createProduct(newProduct);
+    productsWindow.webContents.send('product:created', product);
+});
+
+/* Template Main Menu */
 let templateMainMenu = [
     {
         label: 'File',
         submenu: [
             {
-                label: 'New Prodcut',
-                accelerator: process.platform === 'darwin' ? 'command+N' : 'Ctrl+N',
+                label: 'Products',
+                accelerator: process.platform === 'darwin' ? 'command+P' : 'Ctrl+P',
                 click() {
-                    newProductWindow = new BrowserWindow({
-                        width: 400,
-                        height: 350,
-                        title: 'New Product',
+                    productsWindow = new BrowserWindow({
+                        title: 'Products',
                         webPreferences: {
                             contextIsolation: false,
                             nodeIntegration: true,
+                            devTools: true,
                             // nodeIntegrationInWorker: true,
                             // enableRemoteModule: true
                         },
                     });
-                    // newProductWindow.setMenu(null);
-                    newProductWindow.loadURL(url.format({
-                        pathname: path.join(__dirname, './views/newProductWindow.html'),
+                    productsWindow.maximize();
+                    // productsWindow.setMenu(null);
+                    productsWindow.loadURL(url.format({
+                        pathname: path.join(__dirname, './views/productsWindow.html'),
                         protocol: 'file',
                         slashes: true,
                     }));
-                    newProductWindow.on('close', () => {
-                        newProductWindow = null;
+                    productsWindow.on('close', () => {
+                        productsWindow = null;
                     });
                 }
             },
@@ -87,3 +135,40 @@ if (process.env.NODE_ENV !== 'production') {
         ]
     });
 }
+
+/* MySQL Actions */
+const getProducts = async () => {
+    const conn = await getConnection();
+    const products = await conn.query('SELECT * FROM products');
+    return products;
+}
+const createProduct = async (newProduct) => {
+    const conn = await getConnection();
+    await conn.query('INSERT INTO products SET ?', newProduct).then(res => {
+        new Notification({
+            title: 'Products',
+            body: 'New product added successfully.',
+        }).show();
+        newProduct.id = res.insertId;
+        productsWindow.focus();
+        newProductWindow.close();
+    }).catch(err => {
+        handleCreateProductError(err)
+    });
+    return newProduct;
+}
+
+const handleCreateProductError = ({ errno }) => {
+    let message = '';
+    switch (errno) {
+        case 1062:
+            message = 'The code entered is already in the database. Please enter a new code.'
+            break;
+        default:
+            break;
+    }
+    new Notification({
+        title: 'Error New Product',
+        body: message,
+    }).show();
+};

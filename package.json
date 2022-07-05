@@ -24,6 +24,10 @@
   },
   "homepage": "https://github.com/jessyavalos1615/pdv-electron#readme",
   "devDependencies": {
-    "electron": "^19.0.6"
+    "electron": "^19.0.6",
+    "electron-reload": "^2.0.0-alpha.1"
+  },
+  "dependencies": {
+    "promise-mysql": "^5.2.0"
   }
 }
