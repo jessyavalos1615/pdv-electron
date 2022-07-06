@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Notification, dialog } = require('electron');
 const url = require('url');
 const path = require('path');
 
@@ -11,6 +11,7 @@ if (process.env.NODE_ENV !== 'production') {
 let mainWindow;
 let productsWindow;
 let newProductWindow;
+let editProductWindow;
 
 app.on('ready', () => {
     mainWindow = new BrowserWindow({
@@ -41,10 +42,12 @@ ipcMain.on('product:all', async () => {
 });
 
 ipcMain.on('product:add', e => {
+    editProductWindow?.close();
+    editProductWindow = null;
     newProductWindow = new BrowserWindow({
         width: 500,
         height: 600,
-        title: 'Products',
+        title: 'Add New Product',
         movable: false,
         webPreferences: {
             contextIsolation: false,
@@ -68,6 +71,64 @@ ipcMain.on('product:add', e => {
 ipcMain.on('product:new', async (e, newProduct) => {
     const product = await createProduct(newProduct);
     productsWindow.webContents.send('product:created', product);
+});
+
+ipcMain.on('product:edit', async (e, id) => {
+    const product = await getProduct(id);
+    if (product.length > 0) {
+        newProductWindow?.close();
+        newProductWindow = null;
+        editProductWindow = new BrowserWindow({
+            width: 500,
+            height: 600,
+            title: 'Edit Product',
+            movable: false,
+            webPreferences: {
+                contextIsolation: false,
+                nodeIntegration: true,
+                // nodeIntegrationInWorker: true,
+                // enableRemoteModule: true
+            },
+        });
+        // newProductWindow.setMenu(null);
+        editProductWindow.loadURL(url.format({
+            pathname: path.join(__dirname, './views/editProductWindow.html'),
+            protocol: 'file',
+            slashes: true,
+        }));
+        editProductWindow.webContents.send('product:edit', product[0]);
+        editProductWindow.on('close', () => {
+            editProductWindow = null;
+            productsWindow.focus();
+        });
+    } else {
+        new Notification({
+            title: 'Products',
+            body: 'Error finding this product. Please reload this window.'
+        }).show();
+    }
+});
+
+ipcMain.on('product:update', async (e, product) => {
+    await updateProduct(product);
+    const products = await getProducts();
+    productsWindow.webContents.send('product:all', products);
+});
+
+ipcMain.on('product:delete', async (e, id) => {
+    const { response } = await dialog.showMessageBox({
+        buttons: ["Yes", "Cancel"],
+        message: "Do you really want to delete this product?"
+    });
+    if (response === 0) {
+        await deleteProduct(id);
+        const products = await getProducts();
+        productsWindow.webContents.send('product:all', products);
+        new Notification({
+            title: 'Products',
+            body: 'Product deleted successfully.',
+        }).show();
+    }
 });
 
 /* Template Main Menu */
@@ -98,6 +159,10 @@ let templateMainMenu = [
                     }));
                     productsWindow.on('close', () => {
                         productsWindow = null;
+                        newProductWindow?.close();
+                        newProductWindow = null;
+                        editProductWindow?.close();
+                        editProductWindow = null;
                     });
                 }
             },
@@ -137,11 +202,18 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 /* MySQL Actions */
+const getProduct = async (id) => {
+    const conn = await getConnection();
+    const product = await conn.query('SELECT * FROM products WHERE id = ?', id);
+    return product;
+}
+
 const getProducts = async () => {
     const conn = await getConnection();
     const products = await conn.query('SELECT * FROM products');
     return products;
 }
+
 const createProduct = async (newProduct) => {
     const conn = await getConnection();
     await conn.query('INSERT INTO products SET ?', newProduct).then(res => {
@@ -152,10 +224,32 @@ const createProduct = async (newProduct) => {
         newProduct.id = res.insertId;
         productsWindow.focus();
         newProductWindow.close();
+        newProductWindow = null;
     }).catch(err => {
         handleCreateProductError(err)
     });
     return newProduct;
+}
+
+const updateProduct = async (product) => {
+    console.log(product)
+    const conn = await getConnection();
+    await conn.query('UPDATE products SET ? WHERE id = ?', [product, product.id]).then(res => { 
+        new Notification({
+            title: 'Products',
+            body: 'Product updated successfully.',
+        }).show();
+        productsWindow.focus();
+        editProductWindow.close();
+        editProductWindow = null;
+    }).catch(err => {
+        handleCreateProductError(err);
+     });
+}
+
+const deleteProduct = async (id) => {
+    const conn = await getConnection();
+    await conn.query('DELETE FROM products WHERE id = ?', id);
 }
 
 const handleCreateProductError = ({ errno }) => {

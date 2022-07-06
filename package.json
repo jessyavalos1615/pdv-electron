@@ -28,6 +28,7 @@
     "electron-reload": "^2.0.0-alpha.1"
   },
   "dependencies": {
+    "moment": "^2.29.3",
     "promise-mysql": "^5.2.0"
   }
 }

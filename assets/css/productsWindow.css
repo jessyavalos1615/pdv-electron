@@ -1,0 +1,14 @@
+td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+td:last-of-type {
+    min-width: 9rem;
+}
+
+span.material-symbols-outlined {
+    cursor: pointer;
+    user-select: none;
+}
